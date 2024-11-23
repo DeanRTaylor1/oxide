@@ -49,12 +49,16 @@ async fn main() -> std::io::Result<()> {
         .build();
 
     println!("Select query: {}", query);
-    let user: Option<User> = db.query_optional(query).await.expect("msg");
+    let user = db.query_one::<User>(query).await.expect("msg");
 
-    if let Some(user) = user {
-        println!("Found user: {:?}", user);
-        println!("user name: {}", user.name);
-        println!("user email: {}", user.email);
+    let update = User::update(user.id)
+        .set(User::columns().email, "john@updated.com".to_string())
+        .build();
+
+    println!("Update query: {}", update);
+    match db.execute(update).await {
+        Ok(_) => println!("User updated"),
+        Err(e) => println!("{:?}", e),
     }
 
     routes(&mut server);

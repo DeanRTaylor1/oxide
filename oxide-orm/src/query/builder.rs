@@ -139,6 +139,43 @@ impl<M: Model<C>, C: ModelColumns<Model = M>> OxideQueryBuilder<M, C> {
     }
 }
 
+/* Example update User::update().value(User::columns().name, "John Doe").build();
+update will pass self and existing properties will be applied
+*/
+
+#[derive(Debug, Clone)]
+pub struct OxideUpdateQueryBuilder<M: Model<C>, C: ModelColumns<Model = M>> {
+    id: i32, // Just store the ID instead of the whole model
+    _marker: PhantomData<(M, C)>,
+    updates: Vec<(String, String)>, // Store column-value pairs
+}
+
+impl<M: Model<C>, C: ModelColumns<Model = M>> OxideUpdateQueryBuilder<M, C> {
+    pub fn new(id: i32) -> Self {
+        Self {
+            id,
+            _marker: PhantomData,
+            updates: vec![],
+        }
+    }
+
+    pub fn set<T: ToSql>(mut self, column: Column<M, T>, value: T) -> Self {
+        self.updates.push((column.name.to_string(), value.to_sql()));
+        self
+    }
+
+    pub fn build(&self) -> String {
+        let updates = self
+            .updates
+            .iter()
+            .map(|(col, val)| format!("{} = {}", col, val))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        format!("UPDATE {} SET {} WHERE id = {}", M::TABLE, updates, self.id)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct OxideInsertQueryBuilder<M: Model<C>, C: ModelColumns<Model = M>> {
     columns: Vec<String>,

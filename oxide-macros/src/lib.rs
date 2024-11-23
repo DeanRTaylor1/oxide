@@ -78,6 +78,14 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
                 oxide_orm::OxideInsertQueryBuilder::new()
             }
 
+            pub fn update(id: i32) -> oxide_orm::OxideUpdateQueryBuilder<Self, #columns_name> {
+                oxide_orm::OxideUpdateQueryBuilder::new(id)
+            }
+
+            pub fn get_field<T: Clone>(&self, field: &Option<T>) -> Option<T> {
+                field.clone()
+            }
+
             pub fn columns() -> #columns_name {
                 <Self as oxide_orm::Model<#columns_name>>::columns()
             }

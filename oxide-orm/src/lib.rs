@@ -7,13 +7,14 @@ mod schema;
 mod types;
 
 pub use database::{Database, Error};
-pub use query::{OxideInsertQueryBuilder, OxideQueryBuilder};
+pub use query::{OxideInsertQueryBuilder, OxideQueryBuilder, OxideUpdateQueryBuilder};
 pub use schema::{Column, Model, ModelColumns};
 pub use types::{SqlType, ToSql};
 
 // Create a prelude for easy imports
 pub mod prelude {
     pub use super::{
-        Column, Model, ModelColumns, OxideInsertQueryBuilder, OxideQueryBuilder, SqlType, ToSql,
+        Column, Model, ModelColumns, OxideInsertQueryBuilder, OxideQueryBuilder,
+        OxideUpdateQueryBuilder, SqlType, ToSql,
     };
 }
