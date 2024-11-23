@@ -13,6 +13,7 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree that we can analyze
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
+    let table_name = format!("{}s", name.to_string().to_lowercase());
 
     // Create identifier for the companion *Columns struct
     // e.g., User -> UserColumns
@@ -51,7 +52,7 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
         // Implement Model trait to provide table name and column access
         impl Model<#columns_name> for #name {
             // Use the struct name as the database table name
-            const TABLE: &'static str = stringify!(#name);
+            const TABLE: &'static str = stringify!(#table_name);
 
             // Create a columns instance with all field definitions
             fn columns() -> #columns_name {
@@ -83,6 +84,6 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
         }
     };
 
-    println!("Generated code: {}", gen.to_string());
+    // println!("Generated code: {}", gen.to_string());
     gen.into()
 }

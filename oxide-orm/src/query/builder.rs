@@ -1,6 +1,8 @@
 use std::{iter, marker::PhantomData};
 
-use crate::{Column, Database, Model, ModelColumns, ToSql};
+use sqlx::{postgres::PgRow, FromRow};
+
+use crate::{database::Error, Column, Database, Model, ModelColumns, ToSql};
 
 pub struct OxideQueryBuilder<M: Model<C>, C: ModelColumns<Model = M>> {
     conditions: ConditionExpression,
@@ -113,6 +115,27 @@ impl<M: Model<C>, C: ModelColumns<Model = M>> OxideQueryBuilder<M, C> {
         }
 
         query
+    }
+
+    pub async fn fetch_all<T>(self, db: &Database) -> Result<Vec<T>, Error>
+    where
+        T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
+    {
+        db.query(self.build()).await
+    }
+
+    pub async fn fetch_one<T>(self, db: &Database) -> Result<T, Error>
+    where
+        T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
+    {
+        db.query_one(self.build()).await
+    }
+
+    pub async fn fetch_optional<T>(self, db: &Database) -> Result<Option<T>, Error>
+    where
+        T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
+    {
+        db.query_optional(self.build()).await
     }
 }
 

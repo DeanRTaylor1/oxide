@@ -3,13 +3,60 @@ use oxide_core::{
     logger::LogLevel,
     prelude::*,
 };
-use oxide_orm::prelude::*;
+use oxide_orm::{prelude::*, Database, Error};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     example();
+    let db = Database::connect("postgres://oxide:oxide123@localhost:5432/oxide")
+        .await
+        .unwrap();
+
     let mut server = Server::new(Config::default());
     server.static_file("/", "index.html");
+
+    let create_table = "
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR NOT NULL,
+            email VARCHAR NOT NULL UNIQUE,
+            age INTEGER NOT NULL,
+            active BOOLEAN NOT NULL DEFAULT true
+        )
+    ";
+    match db.execute(create_table.to_string()).await {
+        Ok(_) => println!("Table created"),
+        Err(e) => println!("{:?}", e),
+    }
+
+    // Insert a test user
+    let insert = User::insert()
+        .value(User::columns().name, "John Doe".to_string())
+        .value(User::columns().email, "john@example.com".to_string())
+        .value(User::columns().age, 30)
+        .value(User::columns().active, true)
+        .build();
+
+    println!("Insert query: {}", insert);
+    match db.execute(insert).await {
+        Ok(_) => println!("User inserted"),
+        Err(e) => println!("{:?}", e),
+    }
+
+    // Query the user back
+    let query = User::query()
+        .and_where(User::columns().email, "john@example.com".to_string())
+        .build();
+
+    println!("Select query: {}", query);
+    let user: Option<User> = db.query_optional(query).await.expect("msg");
+
+    if let Some(user) = user {
+        println!("Found user: {:?}", user);
+        println!("user name: {}", user.name);
+        println!("user email: {}", user.email);
+    }
+
     routes(&mut server);
     register_middleware(&mut server);
     server.run().await
@@ -122,11 +169,22 @@ fn register_middleware(server: &mut Server) {
 
 #[derive(sqlx::FromRow, Model, Debug, Clone)]
 pub struct User {
-    id: i32,
-    name: String,
-    email: String,
-    age: i32,
-    active: bool,
+    pub id: i32,
+    pub name: String,
+    pub email: String,
+    pub age: i32,
+    pub active: bool,
+}
+
+async fn example_insert(db: &Database) -> Result<(), Error> {
+    let user: Option<User> = User::query()
+        .select([User::columns().name, User::columns().email])
+        .and_where(User::columns().id, 1)
+        .fetch_optional(db)
+        .await?;
+
+    println!("User: {:#?}", user);
+    Ok(())
 }
 
 fn example() {

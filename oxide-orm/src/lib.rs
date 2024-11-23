@@ -6,8 +6,7 @@ mod query;
 mod schema;
 mod types;
 
-pub use database::Database;
-pub use error::Error;
+pub use database::{Database, Error};
 pub use query::{OxideInsertQueryBuilder, OxideQueryBuilder};
 pub use schema::{Column, Model, ModelColumns};
 pub use types::{SqlType, ToSql};
