@@ -130,27 +130,60 @@ pub struct User {
 }
 
 fn example() {
-    // Complex query example
+    let basic_query = User::query()
+        .and_where(User::columns().age, 25)
+        .and_where(User::columns().active, true)
+        .or_where(User::columns().email, "test@example.com".to_string())
+        .build();
+    // SELECT * FROM users WHERE age = 25 AND active = true OR email = 'test@example.com'
+
+    println!("Query: {}", basic_query);
+
+    // Complex grouped conditions
+    let complex_query = User::query()
+        .select([User::columns().name])
+        .and_where(User::columns().active, true)
+        .and_group(|q| {
+            q.and_where(User::columns().age, 25)
+                .or_where(User::columns().age, 30)
+        })
+        .or_group(|q| {
+            q.and_where(User::columns().email, "test@example.com".to_string())
+                .and_where(User::columns().name, "John".to_string())
+        })
+        .build();
+    // SELECT * FROM users
+    // WHERE active = true
+    // AND (age = 25 OR age = 30)
+    // OR (email = 'test@example.com' AND name = 'John')
+
+    println!("Query: {}", complex_query);
+
+    // Deeply nested conditions
     let query = User::query()
-        .select(User::columns().name)
-        .select(User::columns().email)
-        .where_eq(User::columns().active, true)
+        .and_group(|q| {
+            q.and_where(User::columns().age, 25).or_group(|q| {
+                q.and_where(User::columns().email, "test@example.com".to_string())
+                    .and_where(User::columns().active, true)
+            })
+        })
+        .or_group(|q| {
+            q.and_where(User::columns().name, "John".to_string())
+                .and_where(User::columns().age, 30)
+        })
         .build();
 
     println!("Query: {}", query);
-    // SELECT name, email FROM users
-    // WHERE active = TRUE
-    // AND age > 18
-    // AND email LIKE '%@example.com'
-    // AND id IN (1, 2, 3)
 
-    // Query with OR condition
-    let query = User::query()
-        .where_eq(User::columns().email, "test@example.com".to_string())
-        .where_eq(User::columns().email, "other@example.com".to_string())
-        .build();
-
-    println!("Query: {}", query);
     // SELECT * FROM users
     // WHERE (email = 'test@example.com' OR email = 'other@example.com')
+
+    let insert = User::insert()
+        .value(User::columns().name, "John Doe".to_string())
+        .value(User::columns().email, "test@example.com".to_string())
+        .value(User::columns().age, 30)
+        .value(User::columns().active, true)
+        .build();
+
+    println!("Insert: {}", insert);
 }
