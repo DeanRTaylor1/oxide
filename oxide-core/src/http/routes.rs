@@ -111,12 +111,6 @@ impl Route {
             .collect::<Vec<_>>()
             .join("/");
 
-        let logger = Logger::new();
-        logger.log(
-            logger::LogLevel::Info,
-            &format!("raw_path: {} | path_params: {:?}", raw_path, path_params),
-        );
-
         Self {
             pattern: pattern.to_string(),
             raw_path,

@@ -43,9 +43,19 @@ async fn main() -> std::io::Result<()> {
         Err(e) => println!("{:?}", e),
     }
 
+    let res = db
+        .query::<User>(format!("SELECT * FROM {}", User::TABLE))
+        .await;
+
+    match res {
+        Ok(users) => println!("Users: {:#?}", users),
+        Err(e) => println!("{:?}", e),
+    }
+
     // Query the user back
     let query = User::query()
         .and_where(User::columns().email, "john@example.com".to_string())
+        .and_where(User::columns().id, 8)
         .build();
 
     println!("Select query: {}", query);
