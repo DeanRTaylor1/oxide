@@ -1,5 +1,3 @@
-use uuid::Uuid;
-
 #[derive(Debug, Clone, Copy)]
 pub enum SqlType {
     Int,

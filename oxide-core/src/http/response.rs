@@ -1,4 +1,3 @@
-use crate::Logger;
 use flate2::{write::GzEncoder, Compression};
 use std::io::Write;
 
@@ -181,6 +180,10 @@ impl BufferBuilder {
 
     pub fn deleted() -> Self {
         Self::new().status(Self::DELETED)
+    }
+
+    pub fn no_content() -> Self {
+        Self::new().status(Self::NO_CONTENT)
     }
 
     pub fn updated() -> Self {

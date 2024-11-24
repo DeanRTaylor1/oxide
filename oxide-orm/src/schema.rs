@@ -2,16 +2,14 @@ use std::marker::PhantomData;
 
 use sqlx::FromRow;
 
-use crate::ToSql;
-
-pub trait Table: Sized {
-    const NAME: &'static str;
-    type Data;
-    fn create_sql() -> String;
-    fn table_name() -> &'static str {
-        Self::NAME
-    }
-}
+// pub trait Table: Sized {
+//     const NAME: &'static str;
+//     type Data;
+//     fn create_sql() -> String;
+//     fn table_name() -> &'static str {
+//         Self::NAME
+//     }
+// }
 
 pub trait ModelColumns: Sized {
     type Model: Model<Self>;

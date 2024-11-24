@@ -1,6 +1,6 @@
 use oxide_core::Error;
 use sqlx::postgres::PgQueryResult;
-use sqlx::{postgres::PgRow, Error as SqlxError};
+use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Pool, Postgres};
 
 pub type PgPool = Pool<Postgres>;

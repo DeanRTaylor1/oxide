@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{errors::OxideResult, logger::LogLevel, Logger};
+use serde::Serialize;
+
+use crate::{logger::LogLevel, Logger};
 
 use super::{
     files::StaticHandler, BufferBuilder, HttpMethod, HttpRequest, MiddlewareHandler, RouteManager,
@@ -12,9 +14,62 @@ pub struct OxideResponse {
     status: u16,
 }
 
+pub enum OxideRes {
+    Success,     // 200
+    NotFound,    // 404
+    BadRequest,  // 400
+    ServerError, // 500
+    Created,     // 201
+    Deleted,     // 200
+    NoContent,   // 204
+    Updated,     // 201
+}
+
 impl OxideResponse {
-    pub fn new(buffer: Vec<u8>, status: u16) -> Self {
+    pub fn json<T: Serialize>(response_type: OxideRes, data: T) -> Self {
+        let status = Self::get_status(&response_type);
+        let json_string = serde_json::to_string(&data).unwrap_or_default();
+        let builder = Self::get_buffer_with_status(response_type);
+        let buffer = builder.json(json_string).build();
+
         Self { buffer, status }
+    }
+
+    pub fn text(response_type: OxideRes, message: impl AsRef<str>) -> Self {
+        let status = Self::get_status(&response_type);
+        let builder = Self::get_buffer_with_status(response_type);
+
+        let buffer = builder.text(message.as_ref()).build();
+
+        Self { buffer, status }
+    }
+
+    fn get_buffer_with_status(response_type: OxideRes) -> BufferBuilder {
+        return match response_type {
+            OxideRes::Success => BufferBuilder::ok(),
+            OxideRes::NotFound => BufferBuilder::not_found(),
+            OxideRes::BadRequest => BufferBuilder::bad_request(),
+            OxideRes::ServerError => BufferBuilder::server_error(),
+            OxideRes::Created => BufferBuilder::created(),
+            OxideRes::Deleted => BufferBuilder::deleted(),
+            OxideRes::NoContent => BufferBuilder::no_content(),
+            OxideRes::Updated => BufferBuilder::updated(),
+        };
+    }
+
+    fn get_status(response_type: &OxideRes) -> u16 {
+        let status = match response_type {
+            OxideRes::Success => 200,
+            OxideRes::NotFound => 404,
+            OxideRes::BadRequest => 400,
+            OxideRes::ServerError => 500,
+            OxideRes::Created => 201,
+            OxideRes::Deleted => 200,
+            OxideRes::NoContent => 204,
+            OxideRes::Updated => 201,
+        };
+
+        status
     }
 }
 

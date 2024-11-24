@@ -96,6 +96,40 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
     gen.into()
 }
 
+/// Converts an async function into a compatible HTTP request handler for the Oxide framework.
+///
+/// # Usage
+/// ```rust
+/// #[handler]
+/// async fn my_handler(ctx: &Context) -> OxideResponse {
+///     // Your handler logic here
+///     OxideResponse::new(ResponseType::SUCCESS, "Hello World!")
+/// }
+/// ```
+///
+/// # What it does
+/// This macro takes your async function and:
+/// 1. Keeps it as-is so you can still call it directly
+/// 2. Creates a static handler function named `{your_function_name}_handler`
+/// 3. Makes the handler compatible with Oxide's route registration system
+///
+/// # Requirements
+/// Your function must:
+/// - Be async
+/// - Take a single parameter of type `&Context`
+/// - Return an `OxideResponse`
+///
+/// # Example with Route Registration
+/// ```rust
+/// #[handler]
+/// async fn get_user(ctx: &Context) -> OxideResponse {
+///     // Handler logic
+///     OxideResponse::new(ResponseType::SUCCESS, "User data")
+/// }
+///
+/// // The macro creates a static `get_user_handler` that you can register
+/// app.route("/user", Method::GET, get_user_handler);
+/// ```
 #[proc_macro_attribute]
 pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
