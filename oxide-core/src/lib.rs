@@ -17,7 +17,7 @@ pub use server::Server;
 
 pub mod prelude {
     pub use crate::errors::Error;
-    pub use crate::http::{HttpHandler, HttpMethod, OxideResponse, ResponseBuilder};
+    pub use crate::http::{BufferBuilder, HttpHandler, HttpMethod, OxideResponse};
     pub use crate::macros::handler;
     pub use crate::Config;
     pub use crate::Logger;

@@ -1,5 +1,7 @@
+use std::os::macos::raw::stat;
+
 use oxide_core::{
-    http::{AsyncResponse, Context, MiddlewareResult, OxideResponse, ResponseBuilder},
+    http::{AsyncResponse, BufferBuilder, Context, MiddlewareResult, OxideResponse},
     logger::LogLevel,
     prelude::*,
 };
@@ -23,10 +25,26 @@ pub struct User {
 #[handler]
 async fn get_user(ctx: &Context) -> OxideResponse {
     let user_id = ctx.param("id").unwrap_or("0");
-    let db_conn = Database::connect("postgres://oxide:oxide123@localhost:5432/oxide").await?;
+    let db_conn = match Database::connect("postgres://oxide:oxide123@localhost:5432/oxide").await {
+        Ok(db) => db,
+        Err(e) => {
+            let (status, _) = BufferBuilder::INTERNAL_SERVER_ERROR;
+            return OxideResponse::new(
+                BufferBuilder::server_error().text(e.to_string()).build(),
+                status,
+            );
+        }
+    };
+
     let user_id = match user_id.parse::<i32>().ok() {
         Some(id) => id,
-        None => return Ok(ResponseBuilder::bad_request().text("Invalid ID").build()),
+        None => {
+            let (status, _) = BufferBuilder::BAD_REQUEST;
+            return OxideResponse::new(
+                BufferBuilder::bad_request().text("Invalid ID").build(),
+                status,
+            );
+        }
     };
 
     match User::query()
@@ -34,49 +52,112 @@ async fn get_user(ctx: &Context) -> OxideResponse {
         .fetch_one::<User>(&db_conn)
         .await
     {
-        Ok(user) => Ok(ResponseBuilder::ok()
-            .json(serde_json::to_string(&user).unwrap())
-            .build()),
-        Err(_) => Ok(ResponseBuilder::not_found().text("User not found").build()),
+        Ok(user) => {
+            let (status, _) = BufferBuilder::OK;
+            return OxideResponse::new(
+                BufferBuilder::ok()
+                    .json(serde_json::to_string(&user).unwrap())
+                    .build(),
+                status,
+            );
+        }
+        Err(e) => {
+            let (status, _) = BufferBuilder::INTERNAL_SERVER_ERROR;
+            return OxideResponse::new(
+                BufferBuilder::server_error().text(e.to_string()).build(),
+                status,
+            );
+        }
     }
 }
 
 #[handler]
 async fn root(_ctx: &Context) -> OxideResponse {
-    Ok(ResponseBuilder::ok()
-        .text("Hello from Dean's server!")
-        .build())
+    let (status, _) = BufferBuilder::OK;
+    return OxideResponse::new(
+        BufferBuilder::ok()
+            .text("Hello from Dean's server!")
+            .build(),
+        status,
+    );
 }
 
 #[handler]
 async fn user(ctx: &Context) -> OxideResponse {
-    let db = Database::connect("postgres://oxide:oxide123@localhost:5432/oxide").await?;
+    let db = Database::connect("postgres://oxide:oxide123@localhost:5432/oxide")
+        .await
+        .unwrap();
+
     let user_id = match ctx.param("id").and_then(|id| id.parse::<i32>().ok()) {
         Some(id) => id,
-        None => return Ok(ResponseBuilder::bad_request().text("Invalid ID").build()),
+        None => {
+            let (status, _) = BufferBuilder::BAD_REQUEST;
+            return OxideResponse::new(
+                BufferBuilder::bad_request().text("Invalid ID").build(),
+                status,
+            );
+        }
     };
 
-    let user: Option<User> = User::query()
+    let user: Option<User> = match User::query()
         .and_where(User::columns().id, user_id)
         .fetch_optional(&db)
-        .await?;
+        .await
+    {
+        Ok(user) => user,
+        Err(e) => {
+            let (status, _) = BufferBuilder::INTERNAL_SERVER_ERROR;
+            return OxideResponse::new(
+                BufferBuilder::server_error().text(format!("{}", e)).build(),
+                status,
+            );
+        }
+    };
 
-    match user {
-        Some(user) => Ok(ResponseBuilder::ok()
-            .json(serde_json::to_string(&user).unwrap())
-            .build()),
-        None => Ok(ResponseBuilder::not_found().text("User not found").build()),
-    }
+    return match user {
+        Some(user) => {
+            let (status, _) = BufferBuilder::OK;
+            OxideResponse::new(
+                BufferBuilder::ok()
+                    .json(&serde_json::to_string(&user).unwrap())
+                    .build(),
+                status,
+            )
+        }
+        None => {
+            let (status, _) = BufferBuilder::NOT_FOUND;
+            OxideResponse::new(
+                BufferBuilder::not_found().text("User not found").build(),
+                status,
+            )
+        }
+        _ => {
+            let (status, _) = BufferBuilder::INTERNAL_SERVER_ERROR;
+            OxideResponse::new(
+                BufferBuilder::server_error().text("Unknown error").build(),
+                status,
+            )
+        }
+    };
 }
 
 #[handler]
 async fn cookies(ctx: &Context) -> OxideResponse {
     let cookies = ctx.request.cookies();
     match serde_json::to_string(&cookies) {
-        Ok(json) => Ok(ResponseBuilder::ok().json(json).build()),
-        Err(_) => Ok(ResponseBuilder::server_error()
-            .text("Failed to serialize cookies")
-            .build()),
+        Ok(json) => {
+            let (status, _) = BufferBuilder::OK;
+            return OxideResponse::new(BufferBuilder::ok().json(json).build(), status);
+        }
+        _ => {
+            let (status, _) = BufferBuilder::INTERNAL_SERVER_ERROR;
+            return OxideResponse::new(
+                BufferBuilder::server_error()
+                    .text("Failed to serialize cookies")
+                    .build(),
+                status,
+            );
+        }
     }
 }
 
@@ -85,28 +166,46 @@ async fn post(ctx: &Context) -> OxideResponse {
     match ctx.request.json_body::<JsonData>() {
         Some(body) => {
             println!("JSON body: {}", body.message);
-            Ok(ResponseBuilder::created()
-                .text("Hello from Dean's server!")
-                .build())
+            let (status, _) = BufferBuilder::CREATED;
+            return OxideResponse::new(
+                BufferBuilder::created()
+                    .text(format!("Created data for ID: {}", body.message))
+                    .build(),
+                status,
+            );
         }
-        None => Ok(ResponseBuilder::bad_request().text("Bad Request").build()),
+        None => {
+            let (status, _) = BufferBuilder::BAD_REQUEST;
+            return OxideResponse::new(
+                BufferBuilder::bad_request().text("Invalid JSON").build(),
+                status,
+            );
+        }
     }
 }
 
 #[handler]
 async fn put(ctx: &Context) -> OxideResponse {
     let id = ctx.param("id").unwrap_or("0");
-    Ok(ResponseBuilder::created()
-        .text(format!("Updated data for ID: {}", id))
-        .build())
+    let (status, _) = BufferBuilder::UPDATED;
+    return OxideResponse::new(
+        BufferBuilder::updated()
+            .text(format!("Updated data for ID: {}", id))
+            .build(),
+        status,
+    );
 }
 
 #[handler]
 async fn delete(ctx: &Context) -> OxideResponse {
     let id = ctx.param("id").unwrap_or("0");
-    Ok(ResponseBuilder::deleted()
-        .text(format!("Deleted data for ID: {}", id))
-        .build())
+    let (status, _) = BufferBuilder::NO_CONTENT;
+    return OxideResponse::new(
+        BufferBuilder::deleted()
+            .text(format!("Deleted data for ID: {}", id))
+            .build(),
+        status,
+    );
 }
 
 // Middleware functions

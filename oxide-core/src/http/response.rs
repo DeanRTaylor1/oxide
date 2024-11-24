@@ -3,18 +3,17 @@ use flate2::{write::GzEncoder, Compression};
 use std::io::Write;
 
 #[derive(Default)]
-pub struct ResponseBuilder {
+pub struct BufferBuilder {
     status_line: String,
     headers: Vec<(String, String)>,
     body: Vec<u8>,
-    status: u16,
 }
 
-impl ResponseBuilder {
+impl BufferBuilder {
     // Status code constants
     pub const OK: (u16, &'static str) = (200, "OK");
     pub const CREATED: (u16, &'static str) = (201, "Created");
-    pub const UPDATED: (u16, &'static str) = (200, "Success");
+    pub const UPDATED: (u16, &'static str) = (201, "Success");
     pub const NO_CONTENT: (u16, &'static str) = (204, "No Content");
     pub const DELETED: (u16, &'static str) = (200, "Success");
     pub const NOT_FOUND: (u16, &'static str) = (404, "Not Found");
@@ -175,13 +174,17 @@ impl ResponseBuilder {
 }
 
 // Helper methods for common responses
-impl ResponseBuilder {
+impl BufferBuilder {
     pub fn ok() -> Self {
         Self::new().status(Self::OK)
     }
 
     pub fn deleted() -> Self {
         Self::new().status(Self::DELETED)
+    }
+
+    pub fn updated() -> Self {
+        Self::new().status(Self::UPDATED)
     }
 
     pub fn created() -> Self {
