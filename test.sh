@@ -54,7 +54,7 @@ echo "=============================="
 # Basic GET request
 test_request "GET" "/api" 200 "" "Basic GET request to root"
 
-test_request "GET" "/user/10" 200 "10" "Basic GET request to user endpoint"
+test_request "GET" "/user/1" 200 "1" "Basic GET request to user endpoint"
 
 # Non-existent endpoint
 test_request "GET" "/notfound" 404 "" "GET request to non-existent endpoint"

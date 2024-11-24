@@ -89,7 +89,7 @@ impl Connection {
 
         let path = parts.next().unwrap_or("/").to_string();
 
-        let response = self.http_handler.handle(&self.buffer);
+        let response = self.http_handler.handle(&self.buffer).await;
         let duration = start_time.elapsed();
 
         Logger::log_http(&RequestResponse {

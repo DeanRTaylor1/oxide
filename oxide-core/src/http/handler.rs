@@ -1,8 +1,77 @@
 use std::{collections::HashMap, sync::Arc};
 
+use serde::Serialize;
+
+use crate::{logger::LogLevel, Logger};
+
 use super::{
-    files::StaticHandler, HttpMethod, HttpRequest, MiddlewareHandler, ResponseBuilder, RouteManager,
+    files::StaticHandler, BufferBuilder, HttpMethod, HttpRequest, MiddlewareHandler, RouteManager,
 };
+
+// pub type OxideResponse = OxideResult<Vec<u8>>;
+pub struct OxideResponse {
+    buffer: Vec<u8>,
+    status: u16,
+}
+
+pub enum OxideRes {
+    Success,     // 200
+    NotFound,    // 404
+    BadRequest,  // 400
+    ServerError, // 500
+    Created,     // 201
+    Deleted,     // 200
+    NoContent,   // 204
+    Updated,     // 201
+}
+
+impl OxideResponse {
+    pub fn json<T: Serialize>(response_type: OxideRes, data: T) -> Self {
+        let status = Self::get_status(&response_type);
+        let json_string = serde_json::to_string(&data).unwrap_or_default();
+        let builder = Self::get_buffer_with_status(response_type);
+        let buffer = builder.json(json_string).build();
+
+        Self { buffer, status }
+    }
+
+    pub fn text(response_type: OxideRes, message: impl AsRef<str>) -> Self {
+        let status = Self::get_status(&response_type);
+        let builder = Self::get_buffer_with_status(response_type);
+
+        let buffer = builder.text(message.as_ref()).build();
+
+        Self { buffer, status }
+    }
+
+    fn get_buffer_with_status(response_type: OxideRes) -> BufferBuilder {
+        return match response_type {
+            OxideRes::Success => BufferBuilder::ok(),
+            OxideRes::NotFound => BufferBuilder::not_found(),
+            OxideRes::BadRequest => BufferBuilder::bad_request(),
+            OxideRes::ServerError => BufferBuilder::server_error(),
+            OxideRes::Created => BufferBuilder::created(),
+            OxideRes::Deleted => BufferBuilder::deleted(),
+            OxideRes::NoContent => BufferBuilder::no_content(),
+            OxideRes::Updated => BufferBuilder::updated(),
+        };
+    }
+
+    fn get_status(response_type: &OxideRes) -> u16 {
+        let status = match response_type {
+            OxideRes::Success => 200,
+            OxideRes::NotFound => 404,
+            OxideRes::BadRequest => 400,
+            OxideRes::ServerError => 500,
+            OxideRes::Created => 201,
+            OxideRes::Deleted => 200,
+            OxideRes::NoContent => 204,
+            OxideRes::Updated => 201,
+        };
+
+        status
+    }
+}
 
 pub struct RequestResponse {
     pub method: HttpMethod,
@@ -43,13 +112,13 @@ impl HttpHandler {
         }
     }
 
-    pub fn handle(&self, buffer: &[u8]) -> Res {
+    pub async fn handle(&self, buffer: &[u8]) -> Res {
         match HttpRequest::parse(buffer) {
             Some(request) => {
                 if let Some(file_path) = self.static_files.get(&request.path) {
                     if let Some((data, mime)) = StaticHandler::serve(file_path) {
                         return Res::new(
-                            ResponseBuilder::ok()
+                            BufferBuilder::ok()
                                 .header("Content-Type", mime.as_str())
                                 .body(data)
                                 .build(),
@@ -62,15 +131,21 @@ impl HttpHandler {
                     let params = self.extract_params(&route.pattern, &request.path);
                     let context = Context { request, params };
                     match self.middleware.run(context, route) {
-                        Ok(ctx) => Res::new((route.handler)(&ctx), 200),
+                        Ok(ctx) => {
+                            let logger = Logger::new();
+
+                            let res = (route.handler)(&ctx).await;
+                            logger.log(LogLevel::Info, format!("status: {}", res.status,).as_str());
+                            return Res::new(res.buffer, res.status);
+                        }
                         Err(res) => res,
                     }
                 } else {
-                    Res::new(ResponseBuilder::not_found().text("Not Found").build(), 404)
+                    Res::new(BufferBuilder::not_found().text("Not Found").build(), 404)
                 }
             }
             None => Res::new(
-                ResponseBuilder::bad_request().text("Bad Request").build(),
+                BufferBuilder::bad_request().text("Bad Request").build(),
                 400,
             ),
         }

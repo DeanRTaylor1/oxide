@@ -1,14 +1,20 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+pub use oxide_macros::model;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod database;
+mod error;
+mod query;
+mod schema;
+mod types;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub use database::Database;
+pub use query::{OxideInsertQueryBuilder, OxideQueryBuilder, OxideUpdateQueryBuilder};
+pub use schema::{Column, Model, ModelColumns};
+pub use types::{SqlType, ToSql};
+
+// Create a prelude for easy imports
+pub mod prelude {
+    pub use super::{
+        Column, Model, ModelColumns, OxideInsertQueryBuilder, OxideQueryBuilder,
+        OxideUpdateQueryBuilder, SqlType, ToSql,
+    };
 }

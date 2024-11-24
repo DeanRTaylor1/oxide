@@ -1,19 +1,18 @@
 use flate2::{write::GzEncoder, Compression};
 use std::io::Write;
-use crate::Logger;
 
 #[derive(Default)]
-pub struct ResponseBuilder {
+pub struct BufferBuilder {
     status_line: String,
     headers: Vec<(String, String)>,
     body: Vec<u8>,
 }
 
-impl ResponseBuilder {
+impl BufferBuilder {
     // Status code constants
     pub const OK: (u16, &'static str) = (200, "OK");
     pub const CREATED: (u16, &'static str) = (201, "Created");
-    pub const UPDATED: (u16, &'static str) = (200, "Success");
+    pub const UPDATED: (u16, &'static str) = (201, "Success");
     pub const NO_CONTENT: (u16, &'static str) = (204, "No Content");
     pub const DELETED: (u16, &'static str) = (200, "Success");
     pub const NOT_FOUND: (u16, &'static str) = (404, "Not Found");
@@ -25,12 +24,13 @@ impl ResponseBuilder {
     pub const HTML: &'static str = "text/html";
     pub const JSON: &'static str = "application/json";
 
-    const COMPRESSIBLE_TYPES: [&'static str; 4] = [
-        "text/plain", "text/html", "text/css", "application/json",
-    ];
+    const COMPRESSIBLE_TYPES: [&'static str; 4] =
+        ["text/plain", "text/html", "text/css", "application/json"];
     const MIN_COMPRESS_SIZE: usize = 1400;
 
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn status(mut self, status: (u16, &str)) -> Self {
         self.status_line = format!("HTTP/1.1 {} {}", status.0, status.1);
@@ -68,42 +68,40 @@ impl ResponseBuilder {
     }
 
     fn get_accepted_encoding(&self) -> Option<&str> {
-        self.headers.iter()
+        self.headers
+            .iter()
             .find(|(k, _)| k == "Accept-Encoding")
             .map(|(_, v)| v.as_str())
     }
 
     fn should_compress(&self) -> bool {
-        self.headers.iter()
+        self.headers
+            .iter()
             .any(|(k, v)| k == "Content-Type" && Self::COMPRESSIBLE_TYPES.contains(&v.as_str()))
             && self.body.len() > Self::MIN_COMPRESS_SIZE
-            && self.get_accepted_encoding()
-            .map_or(false, |enc| enc.to_lowercase().contains("gzip"))
+            && self
+                .get_accepted_encoding()
+                .map_or(false, |enc| enc.to_lowercase().contains("gzip"))
     }
 
     fn compress_body(&mut self) -> bool {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        match encoder.write_all(&self.body)
-            .and_then(|_| encoder.finish()) {
+        match encoder.write_all(&self.body).and_then(|_| encoder.finish()) {
             Ok(compressed) if compressed.len() < self.body.len() => {
                 self.body = compressed;
-                self.headers.push(("Content-Encoding".to_string(), "gzip".to_string()));
+                self.headers
+                    .push(("Content-Encoding".to_string(), "gzip".to_string()));
                 self.headers.retain(|(k, _)| k != "Content-Length");
-                self.headers.push(("Content-Length".to_string(), self.body.len().to_string()));
+                self.headers
+                    .push(("Content-Length".to_string(), self.body.len().to_string()));
                 true
             }
-            _ => false
+            _ => false,
         }
     }
 
     pub fn build(mut self) -> Vec<u8> {
-
         if self.should_compress() {
-            let logger = Logger::new();
-            logger.log(
-                crate::logger::LogLevel::Info,
-                "Compressing response body",
-            );
             self.compress_body();
         }
 
@@ -175,13 +173,21 @@ impl ResponseBuilder {
 }
 
 // Helper methods for common responses
-impl ResponseBuilder {
+impl BufferBuilder {
     pub fn ok() -> Self {
         Self::new().status(Self::OK)
     }
 
     pub fn deleted() -> Self {
         Self::new().status(Self::DELETED)
+    }
+
+    pub fn no_content() -> Self {
+        Self::new().status(Self::NO_CONTENT)
+    }
+
+    pub fn updated() -> Self {
+        Self::new().status(Self::UPDATED)
     }
 
     pub fn created() -> Self {
