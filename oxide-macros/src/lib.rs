@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, ItemFn};
 
 /// A derive macro that generates ORM functionality for structs
 /// This creates:
@@ -94,4 +94,26 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
 
     // println!("Generated code: {}", gen.to_string());
     gen.into()
+}
+
+#[proc_macro_attribute]
+pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input_fn = parse_macro_input!(item as ItemFn);
+    let fn_name = &input_fn.sig.ident;
+    let handler_name = format!("{}_handler", fn_name);
+    let handler_ident = syn::Ident::new(&handler_name, fn_name.span());
+    let fn_block = &input_fn.block;
+    let fn_vis = &input_fn.vis;
+    let fn_attrs = &input_fn.attrs;
+
+    let output = quote! {
+        #(#fn_attrs)*
+        #fn_vis async fn #fn_name(ctx: &Context) -> Result<Vec<u8>, Error>
+            #fn_block
+
+        #[allow(non_upper_case_globals)]
+        pub static #handler_ident: fn(&Context) -> AsyncResponse<'_> = |ctx| Box::pin(#fn_name(ctx));
+    };
+
+    output.into()
 }

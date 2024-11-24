@@ -967,6 +967,7 @@ name = "oxide-examples"
 version = "0.1.0"
 dependencies = [
  "oxide-core",
+ "oxide-macros",
  "oxide-orm",
  "serde",
  "serde_json",

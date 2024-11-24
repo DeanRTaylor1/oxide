@@ -2,32 +2,11 @@ use oxide_core::{
     http::{AsyncResponse, Context},
     prelude::*,
 };
+use oxide_macros::handler;
 use oxide_orm::{prelude::*, Database, Error};
 
-trait Boxer {
-    fn boxed(self, api_handler: ApiHandler) -> fn(&Context) -> AsyncResponse<'static>;
-}
-
-struct ApiHandler {
-    handler: Result<UnboxedHandler, Error>,
-}
-
-impl ApiHandler {
-    fn new(handler: Result<UnboxedHandler, Error>) -> Self {
-        Self { handler }
-    }
-}
-
-impl Boxer for ApiHandler {
-    fn boxed(self, api_handler: ApiHandler) -> fn(&Context) -> AsyncResponse<'static> {
-        move |ctx| match self.handler {
-            Ok(handler) => Box::pin(handler(ctx)),
-            Err(err) => Box::pin(async move { Err(err) }),
-        }
-    }
-}
-
-async fn user_handler(ctx: &Context) -> Result<Vec<u8>, Error> {
+#[handler]
+async fn get_user(ctx: &Context) -> Result<Vec<u8>, Error> {
     let user_id = ctx.param("id").unwrap_or("0");
     let db_conn = Database::connect("postgres://oxide:oxide123@localhost:5432/oxide").await?;
     // convert user_id to i32
@@ -46,10 +25,6 @@ async fn user_handler(ctx: &Context) -> Result<Vec<u8>, Error> {
             .build()),
         Err(_) => Ok(ResponseBuilder::not_found().text("User not found").build()),
     }
-}
-
-fn get_user(ctx: &Context) -> AsyncResponse<'_> {
-    Box::pin(user_handler(ctx))
 }
 
 #[tokio::main]
@@ -126,7 +101,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 fn user_routes(server: &mut Server) {
-    server.router.get("/users/:id", get_user);
+    server.router.get("/users/:id", get_user_handler);
 }
 
 // #[derive(Debug, serde::Deserialize)]
