@@ -3,14 +3,14 @@ use oxide_core::{
     logger::LogLevel,
     prelude::*,
 };
-use oxide_orm::{prelude::*, Database};
+use oxide_orm::{model, prelude::*, Database};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct JsonData {
     message: String,
 }
 
-#[derive(Model)]
+#[model]
 pub struct User {
     pub id: i32,
     pub name: String,
@@ -19,7 +19,6 @@ pub struct User {
     pub active: bool,
 }
 
-// All handlers using the new macro
 #[handler]
 async fn get_user(ctx: &Context) -> OxideResponse {
     let user_id = ctx.param("id").unwrap_or("0");
@@ -40,9 +39,9 @@ async fn get_user(ctx: &Context) -> OxideResponse {
         }
     };
 
-    match OxideUser::query()
-        .and_where(OxideUser::columns().id, user_id)
-        .fetch_one::<OxideUser>(&db_conn)
+    match User::query()
+        .and_where(User::columns().id, user_id)
+        .fetch_one::<User>(&db_conn)
         .await
     {
         Ok(user) => OxideResponse::json(OxideRes::Success, user),
@@ -70,8 +69,8 @@ async fn user(ctx: &Context) -> OxideResponse {
         }
     };
 
-    let user: Option<OxideUser> = match OxideUser::query()
-        .and_where(OxideUser::columns().id, user_id)
+    let user: Option<User> = match User::query()
+        .and_where(User::columns().id, user_id)
         .fetch_optional(&db)
         .await
     {
@@ -83,7 +82,7 @@ async fn user(ctx: &Context) -> OxideResponse {
 
     return match user {
         Some(user) => OxideResponse::json(OxideRes::Success, user),
-        None => OxideResponse::text(OxideRes::BadRequest, "OxideUser not found".to_string()),
+        None => OxideResponse::text(OxideRes::BadRequest, "User not found".to_string()),
     };
 }
 
@@ -191,57 +190,57 @@ fn register_middleware(server: &mut Server) {
 
 // Database example functions
 async fn example_insert(db: &Database) -> Result<(), Error> {
-    let user: Option<OxideUser> = OxideUser::query()
-        .select([OxideUser::columns().name, OxideUser::columns().email])
-        .and_where(OxideUser::columns().id, 1)
+    let user: Option<User> = User::query()
+        .select([User::columns().name, User::columns().email])
+        .and_where(User::columns().id, 1)
         .fetch_optional(db)
         .await?;
 
-    println!("OxideUser: {:#?}", user);
+    println!("User: {:#?}", user);
     Ok(())
 }
 
 fn example_queries() {
-    let basic_query = OxideUser::query()
-        .and_where(OxideUser::columns().age, 25)
-        .and_where(OxideUser::columns().active, true)
-        .or_where(OxideUser::columns().email, "test@example.com".to_string())
+    let basic_query = User::query()
+        .and_where(User::columns().age, 25)
+        .and_where(User::columns().active, true)
+        .or_where(User::columns().email, "test@example.com".to_string())
         .build();
     println!("Basic Query: {}", basic_query);
 
-    let complex_query = OxideUser::query()
-        .select([OxideUser::columns().name])
-        .and_where(OxideUser::columns().active, true)
+    let complex_query = User::query()
+        .select([User::columns().name])
+        .and_where(User::columns().active, true)
         .and_group(|q| {
-            q.and_where(OxideUser::columns().age, 25)
-                .or_where(OxideUser::columns().age, 30)
+            q.and_where(User::columns().age, 25)
+                .or_where(User::columns().age, 30)
         })
         .or_group(|q| {
-            q.and_where(OxideUser::columns().email, "test@example.com".to_string())
-                .and_where(OxideUser::columns().name, "John".to_string())
+            q.and_where(User::columns().email, "test@example.com".to_string())
+                .and_where(User::columns().name, "John".to_string())
         })
         .build();
     println!("Complex Query: {}", complex_query);
 
-    let nested_query = OxideUser::query()
+    let nested_query = User::query()
         .and_group(|q| {
-            q.and_where(OxideUser::columns().age, 25).or_group(|q| {
-                q.and_where(OxideUser::columns().email, "test@example.com".to_string())
-                    .and_where(OxideUser::columns().active, true)
+            q.and_where(User::columns().age, 25).or_group(|q| {
+                q.and_where(User::columns().email, "test@example.com".to_string())
+                    .and_where(User::columns().active, true)
             })
         })
         .or_group(|q| {
-            q.and_where(OxideUser::columns().name, "John".to_string())
-                .and_where(OxideUser::columns().age, 30)
+            q.and_where(User::columns().name, "John".to_string())
+                .and_where(User::columns().age, 30)
         })
         .build();
     println!("Nested Query: {}", nested_query);
 
-    let insert = OxideUser::insert()
-        .value(OxideUser::columns().name, "John Doe".to_string())
-        .value(OxideUser::columns().email, "test@example.com".to_string())
-        .value(OxideUser::columns().age, 30)
-        .value(OxideUser::columns().active, true)
+    let insert = User::insert()
+        .value(User::columns().name, "John Doe".to_string())
+        .value(User::columns().email, "test@example.com".to_string())
+        .value(User::columns().age, 30)
+        .value(User::columns().active, true)
         .build();
     println!("Insert Query: {}", insert);
 }
@@ -270,21 +269,21 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Insert a test user
-    let insert = OxideUser::insert()
-        .value(OxideUser::columns().name, "John Doe".to_string())
-        .value(OxideUser::columns().email, "john@example.com".to_string())
-        .value(OxideUser::columns().age, 30)
-        .value(OxideUser::columns().active, true)
+    let insert = User::insert()
+        .value(User::columns().name, "John Doe".to_string())
+        .value(User::columns().email, "john@example.com".to_string())
+        .value(User::columns().age, 30)
+        .value(User::columns().active, true)
         .build();
 
     println!("Insert query: {}", insert);
     match db.execute(insert).await {
-        Ok(_) => println!("OxideUser inserted"),
+        Ok(_) => println!("User inserted"),
         Err(e) => println!("{:?}", e),
     }
 
     let res = db
-        .query::<OxideUser>(format!("SELECT * FROM {}", OxideUser::TABLE))
+        .query::<User>(format!("SELECT * FROM {}", User::TABLE))
         .await;
 
     match res {
@@ -298,21 +297,21 @@ async fn main() -> std::io::Result<()> {
     user_routes(&mut server);
 
     // Query example
-    let query = OxideUser::query()
-        .and_where(OxideUser::columns().email, "john@example.com".to_string())
-        .and_where(OxideUser::columns().id, 8)
+    let query = User::query()
+        .and_where(User::columns().email, "john@example.com".to_string())
+        .and_where(User::columns().id, 8)
         .build();
 
     println!("Select query: {}", query);
-    let user = db.query_one::<OxideUser>(query).await.expect("msg");
+    let user = db.query_one::<User>(query).await.expect("msg");
 
-    let update = OxideUser::update(user.id)
-        .set(OxideUser::columns().email, "john@updated.com".to_string())
+    let update = User::update(user.id)
+        .set(User::columns().email, "john@updated.com".to_string())
         .build();
 
     println!("Update query: {}", update);
     match db.execute(update).await {
-        Ok(_) => println!("OxideUser updated"),
+        Ok(_) => println!("User updated"),
         Err(e) => println!("{:?}", e),
     }
 

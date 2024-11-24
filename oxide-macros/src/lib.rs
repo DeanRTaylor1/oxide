@@ -1,73 +1,106 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, ItemFn};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, ItemFn, ItemStruct};
 
-#[proc_macro_derive(Model)]
-pub fn derive_model(input: TokenStream) -> TokenStream {
-    // Parse the input tokens into a syntax tree that we can analyze
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
+/// Enhances a struct with ORM functionality and common derives for use with the Oxide framework.
+///
+/// # Usage
+/// ```rust
+/// #[model]
+/// pub struct User {
+///     pub id: i32,
+///     pub name: String,
+///     pub email: String,
+///     pub age: i32,
+///     pub active: bool,
+/// }
+/// ```
+///
+/// # What it does
+/// The `#[model]` macro modifies your struct to:
+/// 1. Automatically derive commonly needed traits:
+///    - `Debug`, `Clone`, `serde::Serialize`, `serde::Deserialize`, `sqlx::FromRow`
+/// 2. Generate a companion `Columns` struct (e.g., `UserColumns`) for type-safe query building.
+/// 3. Implement the `Model` trait, including:
+///    - A `table()` method for accessing the table name (`users` for the example above).
+///    - A `columns()` method for accessing field metadata.
+/// 4. Add query-building methods for use with Oxide ORM:
+///    - `query()`, `insert()`, `update(id)`, etc.
+///
+/// # Requirements
+/// - The struct must have named fields.
+/// - The struct's fields should map directly to database columns.
+///
+/// # Example
+/// ```rust
+/// #[model]
+/// pub struct Product {
+///     pub id: i32,
+///     pub name: String,
+///     pub price: f64,
+///     pub in_stock: bool,
+/// }
+///
+/// // Usage
+/// fn main() {
+///     let query = Product::query().filter(Product::columns().price.gt(10.0));
+///     println!("Generated query: {:?}", query);
+/// }
+/// ```
+///
+/// # Notes
+/// - The table name is automatically derived by pluralizing the struct name (e.g., `Product` -> `products`).
+/// - Column metadata is accessible through the generated `Columns` struct (e.g., `Product::columns().name`).
+/// - This macro eliminates the need to manually implement boilerplate for database operations.
+
+#[proc_macro_attribute]
+pub fn model(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // Parse the input tokens as a struct definition
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident; // Struct name (e.g., `User`)
     let table_name = format!("{}s", name.to_string().to_lowercase());
-
-    // Create identifier for the companion *Columns struct
     let columns_name = format_ident!("{}Columns", name);
-    let oxide_name = format_ident!("Oxide{}", name); // e.g., `OxideUser`
 
-    // Extract the fields from the struct, ensuring it's a struct with named fields
-    let fields = match &input.data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => &fields.named,
-            _ => panic!("Only named fields are supported"),
-        },
-        _ => panic!("Only structs are supported"),
+    // Extract fields
+    let fields = match input.fields {
+        syn::Fields::Named(ref named) => &named.named,
+        _ => panic!("Only named fields are supported"),
     };
 
-    // Collect field properties into vectors for reuse
-    let field_idents: Vec<_> = fields.iter().map(|f| &f.ident).collect(); // Field names
-    let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect(); // Field types
+    let field_idents: Vec<_> = fields.iter().map(|f| &f.ident).collect();
+    let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect();
 
-    // Generate the companion types and implementations
-    let gen = quote! {
+    // Generate code to modify the struct definition and add implementations
+    let output = quote! {
         #[derive(
             Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow
         )]
-        pub struct #oxide_name {
-            #(
-                pub #field_idents: #field_types,
-            )*
-        }
+        #input
 
-        // Create the columns struct that holds metadata about each field
         #[derive(Debug, Clone)]
         pub struct #columns_name {
             #(
-                // Each field becomes a Column<Model, Type>
-                pub #field_idents: Column<#oxide_name, #field_types>,
+                pub #field_idents: Column<#name, #field_types>,
             )*
         }
 
-        // Implement ModelColumns trait to enable type-safe query building
         impl ModelColumns for #columns_name {
-            type Model = #oxide_name;
+            type Model = #name;
         }
 
-        // Implement Model trait to provide table name and column access
-        impl Model<#columns_name> for #oxide_name {
-            // Use the struct name as the database table name
+        impl Model<#columns_name> for #name {
             const TABLE: &'static str = stringify!(#table_name);
 
-            // Create a columns instance with all field definitions
             fn columns() -> #columns_name {
                 #columns_name {
                     #(
-                        // Initialize each column with its name
                         #field_idents: Column::new(stringify!(#field_idents)),
                     )*
                 }
             }
         }
 
-        impl #oxide_name {
+        impl #name {
             pub fn table() -> &'static str {
                 Self::TABLE
             }
@@ -94,7 +127,7 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
         }
     };
 
-    gen.into()
+    output.into()
 }
 
 /// Converts an async function into a compatible HTTP request handler for the Oxide framework.

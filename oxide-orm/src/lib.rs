@@ -1,4 +1,4 @@
-pub use oxide_macros::Model;
+pub use oxide_macros::model;
 
 mod database;
 mod error;
