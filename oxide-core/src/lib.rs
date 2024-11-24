@@ -1,5 +1,6 @@
 pub mod config;
 pub mod connection;
+pub mod datasource;
 pub mod errors;
 pub mod http;
 pub mod logger;
@@ -10,12 +11,14 @@ pub mod macros {
 
 pub use config::Config;
 pub use connection::Connection;
+pub use datasource::PgDatabase;
 pub use errors::Error;
 pub use http::{HttpHandler, HttpMethod, RequestResponse};
 pub use logger::Logger;
 pub use server::Server;
 
 pub mod prelude {
+    pub use crate::datasource;
     pub use crate::errors::Error;
     pub use crate::http::{BufferBuilder, HttpHandler, HttpMethod, OxideResponse};
     pub use crate::macros::handler;

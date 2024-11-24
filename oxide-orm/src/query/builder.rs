@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
-use oxide_core::Error;
+use oxide_core::{Error, PgDatabase};
 use sqlx::{postgres::PgRow, FromRow};
 
-use crate::{Column, Database, Model, ModelColumns, ToSql};
+use crate::{Column, Model, ModelColumns, ToSql};
 
 pub struct OxideQueryBuilder<M: Model<C>, C: ModelColumns<Model = M>> {
     conditions: ConditionExpression,
@@ -118,21 +118,21 @@ impl<M: Model<C>, C: ModelColumns<Model = M>> OxideQueryBuilder<M, C> {
         query
     }
 
-    pub async fn fetch_all<T>(self, db: &Database) -> Result<Vec<T>, Error>
+    pub async fn fetch_all<T>(self, db: &PgDatabase) -> Result<Vec<T>, Error>
     where
         T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
     {
         db.query(self.build()).await
     }
 
-    pub async fn fetch_one<T>(self, db: &Database) -> Result<T, Error>
+    pub async fn fetch_one<T>(self, db: &PgDatabase) -> Result<T, Error>
     where
         T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
     {
         db.query_one(self.build()).await
     }
 
-    pub async fn fetch_optional<T>(self, db: &Database) -> Result<Option<T>, Error>
+    pub async fn fetch_optional<T>(self, db: &PgDatabase) -> Result<Option<T>, Error>
     where
         T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
     {

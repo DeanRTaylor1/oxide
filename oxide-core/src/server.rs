@@ -3,7 +3,7 @@ use crate::{
     connection::Connection,
     http::{HttpHandler, MiddlewareHandler, RouteManager},
     logger::LogLevel,
-    Logger,
+    Logger, PgDatabase,
 };
 use std::{collections::HashMap, io, sync::Arc};
 use tokio::net::TcpListener;
@@ -16,6 +16,7 @@ pub struct Server {
     logger: Logger,
     http_handler: Option<Arc<HttpHandler>>,
     static_files: HashMap<String, &'static str>,
+    datasource: Option<PgDatabase>,
 }
 
 impl Server {
@@ -27,7 +28,13 @@ impl Server {
             http_handler: None,
             middleware: MiddlewareHandler::new(),
             static_files: HashMap::new(),
+            datasource: None,
         }
+    }
+
+    pub fn with_datasource(&mut self, datasource: PgDatabase) -> &mut Self {
+        self.datasource = Some(datasource);
+        self
     }
 
     pub fn static_file(&mut self, route: &str, file_path: &'static str) {
@@ -46,10 +53,16 @@ impl Server {
         let shared_middleware = Arc::new(std::mem::take(&mut self.middleware));
         let static_files = Arc::new(std::mem::take(&mut self.static_files));
 
+        let datasource = match &self.datasource {
+            Some(db) => Some(Arc::new(db.clone())),
+            None => None,
+        };
+
         self.http_handler = Some(Arc::new(HttpHandler::new(
             shared_router,
             shared_middleware,
-            static_files
+            static_files,
+            datasource,
         )));
 
         let addr = format!("{}:{}", self.config.host, self.config.port);

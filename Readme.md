@@ -157,3 +157,233 @@ Contributions are welcome! Please read our contributing guidelines and code of c
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+# Oxide Core
+
+## Server Setup
+
+First, initialize the server with a database connection:
+
+```rust
+use oxide_core::{Config, Server, PgDatabase, OxideResponse, OxideRes};
+
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
+    // Initialize database connection
+    let db = PgDatabase::connect("postgres://oxide:oxide123@localhost:5432/oxide")
+        .await
+        .expect("Failed to connect to database");
+
+    // Set up server with database
+    let mut server = Server::new(Config::default());
+    server.static_file("/", "index.html");
+    server.with_datasource(db);
+
+    // Register routes
+    server.router
+        .get("/users", list_users_handler)
+        .get("/users/:id", get_user_handler)
+        .post("/users", create_user_handler);
+
+    server.run().await
+}
+```
+
+## Model Definition
+
+Define your database models:
+
+```rust
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: i32,
+    pub email: String,
+    pub name: String,
+    pub active: bool,
+}
+```
+
+## Handler Implementation
+
+Implement handlers that use the database through context:
+
+```rust
+use oxide_core::{Context, OxideResponse, OxideRes};
+
+#[handler]
+async fn get_user(ctx: &Context) -> OxideResponse {
+    let db = match ctx.db() {
+        Some(db) => db,
+        None => return OxideResponse::text(OxideRes::ServerError, "No database connection"),
+    };
+
+    let user_id = match ctx.param("id").and_then(|id| id.parse::<i32>().ok()) {
+        Some(id) => id,
+        None => return OxideResponse::text(OxideRes::BadRequest, "Invalid ID"),
+    };
+
+    let query = format!("SELECT * FROM users WHERE id = {}", user_id);
+    match db.query_one::<User>(query).await {
+        Ok(user) => OxideResponse::json(OxideRes::Success, user),
+        Err(_) => OxideResponse::text(OxideRes::NotFound, "User not found"),
+    }
+}
+
+#[handler]
+async fn list_users(ctx: &Context) -> OxideResponse {
+    let db = match ctx.db() {
+        Some(db) => db,
+        None => return OxideResponse::text(OxideRes::ServerError, "No database connection"),
+    };
+
+    match db.query::<User>("SELECT * FROM users".to_string()).await {
+        Ok(users) => OxideResponse::json(OxideRes::Success, users),
+        Err(e) => OxideResponse::text(OxideRes::ServerError, e.to_string()),
+    }
+}
+
+#[handler]
+async fn create_user(ctx: &Context) -> OxideResponse {
+    let db = match ctx.db() {
+        Some(db) => db,
+        None => return OxideResponse::text(OxideRes::ServerError, "No database connection"),
+    };
+
+    let user: User = match ctx.request.json_body() {
+        Some(user) => user,
+        None => return OxideResponse::text(OxideRes::BadRequest, "Invalid user data"),
+    };
+
+    let query = format!(
+        "INSERT INTO users (email, name, active) VALUES ('{}', '{}', {}) RETURNING *",
+        user.email, user.name, user.active
+    );
+
+    match db.query_one::<User>(query).await {
+        Ok(created_user) => OxideResponse::json(OxideRes::Created, created_user),
+        Err(e) => OxideResponse::text(OxideRes::ServerError, e.to_string()),
+    }
+}
+
+#[handler]
+async fn update_user(ctx: &Context) -> OxideResponse {
+    let db = match ctx.db() {
+        Some(db) => db,
+        None => return OxideResponse::text(OxideRes::ServerError, "No database connection"),
+    };
+
+    let tx = match db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => return OxideResponse::text(OxideRes::ServerError, e.to_string()),
+    };
+
+    // Example of transaction usage
+    // ... perform multiple operations ...
+    tx.commit().await.map_err(|e| /* handle error */)?;
+
+    OxideResponse::text(OxideRes::Success, "User updated")
+}
+```
+
+## Database Schema
+
+Ensure your database has the required schema:
+
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT true
+);
+```
+
+## Best Practices
+
+1. **Context Usage**:
+
+   - Always check for database availability using `ctx.db()`
+   - Handle the Option return appropriately
+   - Use early returns for error cases
+
+2. **Error Handling**:
+
+   - Return appropriate OxideRes types for different scenarios
+   - Provide meaningful error messages
+   - Use proper HTTP status codes via OxideRes enum
+
+3. **Transactions**:
+
+   - Use transactions for multi-step operations
+   - Properly handle commit/rollback
+   - Implement proper error propagation
+
+4. **Response Types**:
+   - Use `OxideResponse::json` for successful data responses
+   - Use `OxideResponse::text` for error messages
+   - Match response types to your API design
+
+The `PgDatabase` can be used in two ways:
+
+## 1. Standalone Usage
+
+As shown above, you can use it directly with raw SQL queries and structs implementing `FromRow`:
+
+```rust
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: i32,
+    pub name: String,
+}
+
+#[handler]
+async fn get_user(ctx: &Context) -> OxideResponse {
+    let db = match ctx.db() {
+        Some(db) => db,
+        None => return OxideResponse::text(OxideRes::ServerError, "No database connection"),
+    };
+
+    let query = "SELECT * FROM users WHERE id = 1".to_string();
+    match db.query_one::<User>(query).await {
+        Ok(user) => OxideResponse::json(OxideRes::Success, user),
+        Err(e) => OxideResponse::text(OxideRes::ServerError, e.to_string()),
+    }
+}
+```
+
+## 2. With oxide_orm Integration
+
+For a more ergonomic experience with type-safe queries, you can use the `oxide_orm` package:
+
+```rust
+use oxide_orm::model;
+
+#[model]
+pub struct User {
+    pub id: i32,
+    pub name: String,
+}
+
+#[handler]
+async fn get_user(ctx: &Context) -> OxideResponse {
+    let db = match ctx.db() {
+        Some(db) => db,
+        None => return OxideResponse::text(OxideRes::ServerError, "No database connection"),
+    };
+
+    // Type-safe query building
+    match User::query()
+        .and_where(User::columns().id, 1)
+        .fetch_one(db)
+        .await
+    {
+        Ok(user) => OxideResponse::json(OxideRes::Success, user),
+        Err(e) => OxideResponse::text(OxideRes::ServerError, e.to_string()),
+    }
+}
+```
+
+See the `oxide_orm` documentation for more details on the ORM features and type-safe query building.

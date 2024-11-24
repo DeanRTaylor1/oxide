@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use serde::Serialize;
 
-use crate::{logger::LogLevel, Logger};
+use crate::{logger::LogLevel, Logger, PgDatabase};
 
 use super::{
     files::StaticHandler, BufferBuilder, HttpMethod, HttpRequest, MiddlewareHandler, RouteManager,
@@ -97,6 +97,7 @@ pub struct HttpHandler {
     routes: Arc<RouteManager>,
     middleware: Arc<MiddlewareHandler>,
     static_files: Arc<HashMap<String, &'static str>>,
+    datasource: Option<Arc<PgDatabase>>,
 }
 
 impl HttpHandler {
@@ -104,12 +105,19 @@ impl HttpHandler {
         router: Arc<RouteManager>,
         middleware: Arc<MiddlewareHandler>,
         static_files: Arc<HashMap<String, &'static str>>,
+        datasource: Option<Arc<PgDatabase>>,
     ) -> Self {
         Self {
             routes: router,
             middleware,
             static_files,
+            datasource,
         }
+    }
+
+    pub fn with_datasource(mut self, datasource: Arc<PgDatabase>) -> Self {
+        self.datasource = Some(datasource);
+        self
     }
 
     pub async fn handle(&self, buffer: &[u8]) -> Res {
@@ -129,7 +137,10 @@ impl HttpHandler {
 
                 if let Some(route) = self.routes.find_route(&request.path, request.method) {
                     let params = self.extract_params(&route.pattern, &request.path);
-                    let context = Context { request, params };
+                    let mut context = Context::new(request, params);
+                    if let Some(db) = &self.datasource {
+                        context.with_datasource(Arc::clone(db));
+                    }
                     match self.middleware.run(context, route) {
                         Ok(ctx) => {
                             let logger = Logger::new();
@@ -168,9 +179,27 @@ impl HttpHandler {
 pub struct Context {
     pub request: HttpRequest,
     params: HashMap<String, String>,
+    pub datasource: Option<Arc<PgDatabase>>,
 }
 
 impl Context {
+    pub fn new(request: HttpRequest, params: HashMap<String, String>) -> Self {
+        Self {
+            request,
+            params,
+            datasource: None,
+        }
+    }
+
+    pub fn with_datasource(&mut self, datasource: Arc<PgDatabase>) -> &mut Self {
+        self.datasource = Some(datasource);
+        self
+    }
+
+    pub fn db(&self) -> Option<&PgDatabase> {
+        self.datasource.as_ref().map(|db| db.as_ref())
+    }
+
     pub fn param(&self, key: &str) -> Option<&str> {
         self.params.get(key).map(|s| s.as_str())
     }
