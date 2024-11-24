@@ -2,12 +2,6 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, Data, DeriveInput, Fields, ItemFn};
 
-/// A derive macro that generates ORM functionality for structs
-/// This creates:
-/// 1. A companion *Columns struct containing typed column definitions
-/// 2. ModelColumns implementation for type safety
-/// 3. Model implementation for table name and column access
-/// 4. Query builder initialization method
 #[proc_macro_derive(Model)]
 pub fn derive_model(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree that we can analyze
@@ -16,8 +10,8 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
     let table_name = format!("{}s", name.to_string().to_lowercase());
 
     // Create identifier for the companion *Columns struct
-    // e.g., User -> UserColumns
     let columns_name = format_ident!("{}Columns", name);
+    let oxide_name = format_ident!("Oxide{}", name); // e.g., `OxideUser`
 
     // Extract the fields from the struct, ensuring it's a struct with named fields
     let fields = match &input.data {
@@ -28,29 +22,37 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
         _ => panic!("Only structs are supported"),
     };
 
-    // Create iterators for field properties we'll need in the generated code
-    let field_idents = fields.iter().map(|f| &f.ident); // Field names
-    let field_types = fields.iter().map(|f| &f.ty); // Field types
-    let field_names = field_idents.clone(); // Second iterator for names
+    // Collect field properties into vectors for reuse
+    let field_idents: Vec<_> = fields.iter().map(|f| &f.ident).collect(); // Field names
+    let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect(); // Field types
 
     // Generate the companion types and implementations
     let gen = quote! {
+        #[derive(
+            Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow
+        )]
+        pub struct #oxide_name {
+            #(
+                pub #field_idents: #field_types,
+            )*
+        }
+
         // Create the columns struct that holds metadata about each field
         #[derive(Debug, Clone)]
         pub struct #columns_name {
             #(
                 // Each field becomes a Column<Model, Type>
-                pub #field_idents: Column<#name, #field_types>,
+                pub #field_idents: Column<#oxide_name, #field_types>,
             )*
         }
 
         // Implement ModelColumns trait to enable type-safe query building
         impl ModelColumns for #columns_name {
-            type Model = #name;
+            type Model = #oxide_name;
         }
 
         // Implement Model trait to provide table name and column access
-        impl Model<#columns_name> for #name {
+        impl Model<#columns_name> for #oxide_name {
             // Use the struct name as the database table name
             const TABLE: &'static str = stringify!(#table_name);
 
@@ -59,13 +61,13 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
                 #columns_name {
                     #(
                         // Initialize each column with its name
-                        #field_names: Column::new(stringify!(#field_names)),
+                        #field_idents: Column::new(stringify!(#field_idents)),
                     )*
                 }
             }
         }
 
-        impl #name {
+        impl #oxide_name {
             pub fn table() -> &'static str {
                 Self::TABLE
             }
@@ -92,7 +94,6 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
         }
     };
 
-    // println!("Generated code: {}", gen.to_string());
     gen.into()
 }
 
