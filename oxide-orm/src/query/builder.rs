@@ -1,8 +1,9 @@
-use std::{iter, marker::PhantomData};
+use std::marker::PhantomData;
 
+use oxide_core::Error;
 use sqlx::{postgres::PgRow, FromRow};
 
-use crate::{database::Error, Column, Database, Model, ModelColumns, ToSql};
+use crate::{Column, Database, Model, ModelColumns, ToSql};
 
 pub struct OxideQueryBuilder<M: Model<C>, C: ModelColumns<Model = M>> {
     conditions: ConditionExpression,

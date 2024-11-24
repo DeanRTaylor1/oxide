@@ -7,6 +7,7 @@ pub struct ResponseBuilder {
     status_line: String,
     headers: Vec<(String, String)>,
     body: Vec<u8>,
+    status: u16,
 }
 
 impl ResponseBuilder {
@@ -103,8 +104,6 @@ impl ResponseBuilder {
 
     pub fn build(mut self) -> Vec<u8> {
         if self.should_compress() {
-            let logger = Logger::new();
-            logger.log(crate::logger::LogLevel::Info, "Compressing response body");
             self.compress_body();
         }
 

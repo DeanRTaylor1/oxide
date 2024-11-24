@@ -108,7 +108,7 @@ pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let output = quote! {
         #(#fn_attrs)*
-        #fn_vis async fn #fn_name(ctx: &Context) -> Result<Vec<u8>, Error>
+        #fn_vis async fn #fn_name(ctx: &Context) -> OxideResponse
             #fn_block
 
         #[allow(non_upper_case_globals)]

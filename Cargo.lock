@@ -954,11 +954,12 @@ dependencies = [
  "flate2",
  "kqueue",
  "once_cell",
- "oxide-orm",
+ "oxide-macros",
  "rust-embed",
  "serde",
  "serde_json",
  "sha2",
+ "sqlx",
  "tokio",
 ]
 
@@ -989,6 +990,7 @@ name = "oxide-orm"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "oxide-core",
  "oxide-macros",
  "serde",
  "serde_json",

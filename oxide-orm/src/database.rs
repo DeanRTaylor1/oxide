@@ -1,3 +1,4 @@
+use oxide_core::Error;
 use sqlx::postgres::PgQueryResult;
 use sqlx::{postgres::PgRow, Error as SqlxError};
 use sqlx::{FromRow, Pool, Postgres};
@@ -53,11 +54,4 @@ impl Database {
             .await
             .map_err(Error::Database)
     }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    Database(SqlxError),
-    ValidationError(String),
-    ConfigError(String),
 }

@@ -1,8 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
+use crate::errors::OxideResult;
+
 use super::{
     files::StaticHandler, HttpMethod, HttpRequest, MiddlewareHandler, ResponseBuilder, RouteManager,
 };
+
+pub type OxideResponse = OxideResult<Vec<u8>>;
 
 pub struct RequestResponse {
     pub method: HttpMethod,

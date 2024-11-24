@@ -1,10 +1,9 @@
 use oxide_core::{
-    http::{AsyncResponse, Context, MiddlewareResult, ResponseBuilder},
+    http::{AsyncResponse, Context, MiddlewareResult, OxideResponse, ResponseBuilder},
     logger::LogLevel,
     prelude::*,
 };
-use oxide_macros::handler;
-use oxide_orm::{prelude::*, Database, Error};
+use oxide_orm::{prelude::*, Database};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct JsonData {
@@ -22,7 +21,7 @@ pub struct User {
 
 // All handlers using the new macro
 #[handler]
-async fn get_user(ctx: &Context) -> Result<Vec<u8>, Error> {
+async fn get_user(ctx: &Context) -> OxideResponse {
     let user_id = ctx.param("id").unwrap_or("0");
     let db_conn = Database::connect("postgres://oxide:oxide123@localhost:5432/oxide").await?;
     let user_id = match user_id.parse::<i32>().ok() {
@@ -43,14 +42,14 @@ async fn get_user(ctx: &Context) -> Result<Vec<u8>, Error> {
 }
 
 #[handler]
-async fn root(_ctx: &Context) -> Result<Vec<u8>, Error> {
+async fn root(_ctx: &Context) -> OxideResponse {
     Ok(ResponseBuilder::ok()
         .text("Hello from Dean's server!")
         .build())
 }
 
 #[handler]
-async fn user(ctx: &Context) -> Result<Vec<u8>, Error> {
+async fn user(ctx: &Context) -> OxideResponse {
     let db = Database::connect("postgres://oxide:oxide123@localhost:5432/oxide").await?;
     let user_id = match ctx.param("id").and_then(|id| id.parse::<i32>().ok()) {
         Some(id) => id,
@@ -71,7 +70,7 @@ async fn user(ctx: &Context) -> Result<Vec<u8>, Error> {
 }
 
 #[handler]
-async fn cookies(ctx: &Context) -> Result<Vec<u8>, Error> {
+async fn cookies(ctx: &Context) -> OxideResponse {
     let cookies = ctx.request.cookies();
     match serde_json::to_string(&cookies) {
         Ok(json) => Ok(ResponseBuilder::ok().json(json).build()),
@@ -82,7 +81,7 @@ async fn cookies(ctx: &Context) -> Result<Vec<u8>, Error> {
 }
 
 #[handler]
-async fn post(ctx: &Context) -> Result<Vec<u8>, Error> {
+async fn post(ctx: &Context) -> OxideResponse {
     match ctx.request.json_body::<JsonData>() {
         Some(body) => {
             println!("JSON body: {}", body.message);
@@ -95,7 +94,7 @@ async fn post(ctx: &Context) -> Result<Vec<u8>, Error> {
 }
 
 #[handler]
-async fn put(ctx: &Context) -> Result<Vec<u8>, Error> {
+async fn put(ctx: &Context) -> OxideResponse {
     let id = ctx.param("id").unwrap_or("0");
     Ok(ResponseBuilder::created()
         .text(format!("Updated data for ID: {}", id))
@@ -103,7 +102,7 @@ async fn put(ctx: &Context) -> Result<Vec<u8>, Error> {
 }
 
 #[handler]
-async fn delete(ctx: &Context) -> Result<Vec<u8>, Error> {
+async fn delete(ctx: &Context) -> OxideResponse {
     let id = ctx.param("id").unwrap_or("0");
     Ok(ResponseBuilder::deleted()
         .text(format!("Deleted data for ID: {}", id))

@@ -2,12 +2,10 @@ use std::{future::Future, pin::Pin};
 
 use crate::Logger;
 
-use super::{handler::Context, HttpMethod};
-use oxide_orm::Error;
+use super::{handler::Context, HttpMethod, OxideResponse};
 
-pub type UnboxedHandler = fn(&Context) -> Result<Vec<u8>, Error>;
 pub type AsyncHandler = fn(&Context) -> AsyncResponse;
-pub type AsyncResponse<'a> = Pin<Box<dyn Future<Output = Result<Vec<u8>, Error>> + Send + 'a>>;
+pub type AsyncResponse<'a> = Pin<Box<dyn Future<Output = OxideResponse> + Send + 'a>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct RouteManager {
