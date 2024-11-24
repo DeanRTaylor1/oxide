@@ -43,7 +43,7 @@ impl HttpHandler {
         }
     }
 
-    pub fn handle(&self, buffer: &[u8]) -> Res {
+    pub async fn handle(&self, buffer: &[u8]) -> Res {
         match HttpRequest::parse(buffer) {
             Some(request) => {
                 if let Some(file_path) = self.static_files.get(&request.path) {
@@ -62,7 +62,7 @@ impl HttpHandler {
                     let params = self.extract_params(&route.pattern, &request.path);
                     let context = Context { request, params };
                     match self.middleware.run(context, route) {
-                        Ok(ctx) => Res::new((route.handler)(&ctx), 200),
+                        Ok(ctx) => Res::new((route.handler)(&ctx).await.unwrap(), 200),
                         Err(res) => res,
                     }
                 } else {

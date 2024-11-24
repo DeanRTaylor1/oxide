@@ -15,3 +15,4 @@ serde_json = "1.0.133"
 sha2 = "0.10"
 rust-embed = "8.5.0"
 flate2 = "1.0.35"
+oxide-orm = { path = "../oxide-orm" }

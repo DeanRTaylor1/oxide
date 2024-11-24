@@ -1,6 +1,13 @@
-use crate::{logger, Logger};
+use std::{future::Future, pin::Pin};
+
+use crate::Logger;
 
 use super::{handler::Context, HttpMethod};
+use oxide_orm::Error;
+
+pub type UnboxedHandler = fn(&Context) -> Result<Vec<u8>, Error>;
+pub type AsyncHandler = fn(&Context) -> AsyncResponse;
+pub type AsyncResponse<'a> = Pin<Box<dyn Future<Output = Result<Vec<u8>, Error>> + Send + 'a>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct RouteManager {
@@ -38,22 +45,22 @@ impl RouteManager {
         self
     }
 
-    pub fn get(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn get(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         self.add_route(Route::new(path, HttpMethod::Get, handler));
         self
     }
 
-    pub fn post(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn post(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         self.add_route(Route::new(path, HttpMethod::Post, handler));
         self
     }
 
-    pub fn put(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn put(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         self.add_route(Route::new(path, HttpMethod::Put, handler));
         self
     }
 
-    pub fn delete(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn delete(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         self.add_route(Route::new(path, HttpMethod::Delete, handler));
         self
     }
@@ -94,11 +101,11 @@ pub struct Route {
     pub raw_path: String,
     pub path_params: Vec<String>,
     pub method: HttpMethod,
-    pub handler: fn(&Context) -> Vec<u8>,
+    pub handler: AsyncHandler,
 }
 
 impl Route {
-    pub fn new(pattern: &str, method: HttpMethod, handler: fn(&Context) -> Vec<u8>) -> Self {
+    pub fn new(pattern: &str, method: HttpMethod, handler: AsyncHandler) -> Self {
         let path_params = pattern
             .split('/')
             .filter(|s| s.starts_with(':'))
@@ -148,28 +155,28 @@ impl RouteGroup {
         }
     }
 
-    pub fn get(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn get(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         let full_path = format!("{}{}", self.prefix, path);
         self.routes
             .push(Route::new(&full_path, HttpMethod::Get, handler));
         self
     }
 
-    pub fn post(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn post(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         let full_path = format!("{}{}", self.prefix, path);
         self.routes
             .push(Route::new(&full_path, HttpMethod::Post, handler));
         self
     }
 
-    pub fn put(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn put(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         let full_path = format!("{}{}", self.prefix, path);
         self.routes
             .push(Route::new(&full_path, HttpMethod::Put, handler));
         self
     }
 
-    pub fn delete(&mut self, path: &str, handler: fn(&Context) -> Vec<u8>) -> &mut Self {
+    pub fn delete(&mut self, path: &str, handler: AsyncHandler) -> &mut Self {
         let full_path = format!("{}{}", self.prefix, path);
         self.routes
             .push(Route::new(&full_path, HttpMethod::Delete, handler));
